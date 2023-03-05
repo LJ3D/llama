@@ -91,6 +91,8 @@ class llamaWindow(QWidget):
         self.output_text.setReadOnly(True)  # Set the output text to read-only
         self.submit_button = QPushButton("Submit")
         self.submit_button.clicked.connect(self.submit_text)
+        self.submit_button_inplace = QPushButton("Submit into input")
+        self.submit_button_inplace.clicked.connect(self.submit_text_inplace)
         self.temperatureLabel = QLabel("Temperature:")
         self.temperatureInput = QDoubleSpinBox(self)
         self.temperatureInput.setValue(temperature)
@@ -127,6 +129,7 @@ class llamaWindow(QWidget):
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.submit_button)
+        button_layout.addWidget(self.submit_button_inplace)
 
         main_layout = QVBoxLayout()
         main_layout.addLayout(input_layout)
@@ -158,6 +161,12 @@ class llamaWindow(QWidget):
         for result in results: # There should only be one
             self.output_text.setText(result)
 
+    def submit_text_inplace(self):
+        inputText = self.input_text.toPlainText()
+        results = self.generator.generate([inputText], max_gen_len=self.max_gen_len, temperature=self.temperature, top_p=self.top_p)
+        for result in results:
+            self.output_text.setText(result)
+            self.input_text.setText(result)
 
 def main(
     ckpt_dir: str,
