@@ -5,6 +5,8 @@ from typing import Tuple
 import os
 import sys
 import torch
+#import torch_directml
+import fire
 import time
 import json
 
@@ -101,7 +103,5 @@ def main(
         prompt = str(input("Enter prompt:"))
 
 
-# Parse the 1st cmdline argument for the ckpt_dir
-# and the 2nd cmdline argument for the tokenizer_path
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    fire.Fire(main)
