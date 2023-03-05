@@ -5,10 +5,10 @@ from typing import Tuple
 import os
 import sys
 import torch
-#import torch_directml
 import fire
 import time
 import json
+import threading
 
 from pathlib import Path
 
@@ -19,7 +19,6 @@ from llama import ModelArgs, Transformer, Tokenizer, LLaMA
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QPushButton, QDoubleSpinBox, QSpinBox
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 
-import threading
 
 import qdarkstyle
 
@@ -107,9 +106,9 @@ class llamaWindow(QWidget):
         self.setGeometry(100, 100, 500, 300)
 
         # Create widgets
-        self.input_text = QTextEdit()
-        self.submit_button = QPushButton("Submit")
-        self.submit_button.clicked.connect(self.submitText)
+        self.textEdit = QTextEdit()
+        self.generateButton = QPushButton("Start generating")
+        self.generateButton.clicked.connect(self.toggleGenerating)
         self.temperatureLabel = QLabel("Temperature:")
         self.temperatureInput = QDoubleSpinBox(self)
         self.temperatureInput.setValue(temperature)
@@ -122,7 +121,7 @@ class llamaWindow(QWidget):
         self.top_pInput.setRange(0, 1)
         self.top_pInput.setSingleStep(0.05)
         self.top_pInput.valueChanged.connect(lambda: self.changeTopP())
-        self.max_gen_lenLabel = QLabel("Max gen len:")
+        self.max_gen_lenLabel = QLabel("Max chunk generation length (longer is a bit more efficient (i think)):")
         self.max_gen_lenInput = QSpinBox(self)
         self.max_gen_lenInput.setValue(max_gen_len)
         self.max_gen_lenInput.setRange(1, 4096)
@@ -131,7 +130,7 @@ class llamaWindow(QWidget):
         
         # Create layouts
         input_layout = QVBoxLayout()
-        input_layout.addWidget(self.input_text)
+        input_layout.addWidget(self.textEdit)
         input_layout.addWidget(self.temperatureLabel)
         input_layout.addWidget(self.temperatureInput)
         input_layout.addWidget(self.top_pLabel)
@@ -140,7 +139,7 @@ class llamaWindow(QWidget):
         input_layout.addWidget(self.max_gen_lenInput)
         
         button_layout = QHBoxLayout()
-        button_layout.addWidget(self.submit_button)
+        button_layout.addWidget(self.generateButton)
 
         main_layout = QVBoxLayout()
         main_layout.addLayout(input_layout)
@@ -156,6 +155,7 @@ class llamaWindow(QWidget):
         self.max_gen_len = max_gen_len
         self.top_p = top_p
         self.threadAvailable = True
+        self.generating = False
     
     def changeTemp(self):
         self.temperature = self.temperatureInput.value()
@@ -166,11 +166,20 @@ class llamaWindow(QWidget):
     def changeMaxGenLen(self):
         self.max_gen_len = self.max_gen_lenInput.value()
 
+    def toggleGenerating(self):
+        self.generating = not self.generating
+        if self.generating:
+            self.generateButton.setText("Stop generating")
+            self.submitText()
+        else:
+            self.generateButton.setText("Start generating")
+
     def submitText(self):
         if not self.threadAvailable:
             return
         self.threadAvailable = False
-        inputText = self.input_text.toPlainText()
+        self.textEdit.setReadOnly(True)
+        inputText = self.textEdit.toPlainText()
         self.worker = llamaWorker(self.generator, self.temperature, self.max_gen_len, self.top_p)
         self.worker.setInputText(inputText)
         self.thread = threading.Thread(target=self.worker.run)
@@ -179,14 +188,17 @@ class llamaWindow(QWidget):
 
     def setText(self, text):
         self.threadAvailable = True
-        self.input_text.setText(text)
+        self.textEdit.setReadOnly(False)
+        self.textEdit.setText(text)
+        if self.generating:
+            self.submitText()
 
 
 def main(
     ckpt_dir: str,
     tokenizer_path: str,
     temperature: float = 0.8,
-    max_gen_len = 256,
+    max_gen_len = 8,
     top_p: float = 0.95,
     max_seq_len: int = 2048,
     max_batch_size: int = 1,
