@@ -16,6 +16,8 @@ from fairscale.nn.model_parallel.initialize import initialize_model_parallel
 
 from llama import ModelArgs, Transformer, Tokenizer, LLaMA
 
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QPushButton, QDoubleSpinBox
+
 driver = "cuda"
 
 def setup_model_parallel() -> Tuple[int, int]:
@@ -72,6 +74,79 @@ def load(
     return generator
 
 
+
+
+
+class llamaWindow(QWidget):
+    def __init__(self, ckpt_dir, tokenizer_path, temperature, top_p, max_seq_len, max_batch_size):
+        super().__init__()
+        self.setWindowTitle("Text Input Window")
+        self.setGeometry(100, 100, 500, 300)
+
+        # Create widgets
+        self.input_label = QLabel("Input Text:")
+        self.input_text = QTextEdit()
+        self.output_label = QLabel("Output Text:")
+        self.output_text = QTextEdit()
+        self.output_text.setReadOnly(True)  # Set the output text to read-only
+        self.submit_button = QPushButton("Submit")
+        self.submit_button.clicked.connect(self.submit_text)
+        self.temperatureLabel = QLabel("Temperature:")
+        self.temperatureInput = QDoubleSpinBox(self)
+        self.temperatureInput.setValue(temperature)
+        self.temperatureInput.setRange(0, 1)
+        self.temperatureInput.setSingleStep(0.05)
+        self.temperatureInput.valueChanged.connect(lambda: self.changeTemp())
+        self.top_pLabel = QLabel("Top_p:")
+        self.top_pInput = QDoubleSpinBox(self)
+        self.top_pInput.setValue(top_p)
+        self.top_pInput.setRange(0, 1)
+        self.top_pInput.setSingleStep(0.05)
+        self.top_pInput.valueChanged.connect(lambda: self.changeTopP())
+
+        # Create layouts
+        input_layout = QVBoxLayout()
+        input_layout.addWidget(self.input_label)
+        input_layout.addWidget(self.input_text)
+        input_layout.addWidget(self.temperatureLabel)
+        input_layout.addWidget(self.temperatureInput)
+        input_layout.addWidget(self.top_pLabel)
+        input_layout.addWidget(self.top_pInput)
+
+        output_layout = QVBoxLayout()
+        output_layout.addWidget(self.output_label)
+        output_layout.addWidget(self.output_text)
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.submit_button)
+
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(input_layout)
+        main_layout.addLayout(output_layout)
+        main_layout.addLayout(button_layout)
+
+        # Set the main layout of the window
+        self.setLayout(main_layout)
+
+        # Set up the pytorch model
+        local_rank, world_size = setup_model_parallel()
+        self.generator = load(ckpt_dir, tokenizer_path, local_rank, world_size, max_seq_len, max_batch_size)
+        self.temperature = temperature
+        self.top_p = top_p
+    
+    def changeTemp(self):
+        self.temperature = self.temperatureInput.value()
+
+    def changeTopP(self):
+        self.top_p = self.top_pInput.value()
+
+    def submit_text(self):
+        inputText = self.input_text.toPlainText()
+        results = self.generator.generate([inputText], max_gen_len=256, temperature=self.temperature, top_p=self.top_p)
+        for result in results: # There should only be one
+            self.output_text.setText(result)
+
+
 def main(
     ckpt_dir: str,
     tokenizer_path: str,
@@ -80,27 +155,10 @@ def main(
     max_seq_len: int = 512,
     max_batch_size: int = 1,
 ):
-    local_rank, world_size = setup_model_parallel()
-    if local_rank > 0:
-        sys.stdout = open(os.devnull, "w")
-
-    generator = load(
-        ckpt_dir, tokenizer_path, local_rank, world_size, max_seq_len, max_batch_size
-    )
-
-    prompt = str(input("Enter prompt:"))
-
-    while prompt != "":
-        results = generator.generate(
-            [prompt], max_gen_len=256, temperature=temperature, top_p=top_p
-        )
-
-        for result in results:
-            print("\n==================================\n")
-            print(result)
-            print("\n==================================\n")
-
-        prompt = str(input("Enter prompt:"))
+    app = QApplication(sys.argv)
+    window = llamaWindow(ckpt_dir, tokenizer_path, temperature, top_p, max_seq_len, max_batch_size)
+    window.show()
+    sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
