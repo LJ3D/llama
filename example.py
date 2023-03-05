@@ -157,7 +157,7 @@ def main(
     temperature: float = 0.8,
     max_gen_len = 256,
     top_p: float = 0.95,
-    max_seq_len: int = 512,
+    max_seq_len: int = 2048,
     max_batch_size: int = 1,
 ):
     dark_stylesheet = qdarkstyle.load_stylesheet_pyqt5()
