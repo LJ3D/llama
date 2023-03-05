@@ -17,6 +17,9 @@ from fairscale.nn.model_parallel.initialize import initialize_model_parallel
 from llama import ModelArgs, Transformer, Tokenizer, LLaMA
 
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QPushButton, QDoubleSpinBox, QSpinBox
+from PyQt5.QtCore import QObject, pyqtSignal, QThread
+
+import threading
 
 import qdarkstyle
 
@@ -77,7 +80,25 @@ def load(
 
 
 
+class llamaWorker(QObject):
+    finished = pyqtSignal(str)
 
+    def __init__(self, generator, temperature, max_gen_len, top_p):
+        super().__init__()
+        self.generator = generator
+        self.temperature = temperature
+        self.max_gen_len = max_gen_len
+        self.top_p = top_p
+
+    def setInputText(self, inputText):
+        self.inputText = inputText
+
+    def run(self):
+        results = self.generator.generate([self.inputText], max_gen_len=self.max_gen_len, temperature=self.temperature, top_p=self.top_p)
+        final = ""
+        for result in results:
+            final += result
+        self.finished.emit(final)
 
 class llamaWindow(QWidget):
     def __init__(self, ckpt_dir, tokenizer_path, temperature, max_gen_len, top_p, max_seq_len, max_batch_size):
@@ -88,7 +109,7 @@ class llamaWindow(QWidget):
         # Create widgets
         self.input_text = QTextEdit()
         self.submit_button = QPushButton("Submit")
-        self.submit_button.clicked.connect(self.submit_text)
+        self.submit_button.clicked.connect(self.submitText)
         self.temperatureLabel = QLabel("Temperature:")
         self.temperatureInput = QDoubleSpinBox(self)
         self.temperatureInput.setValue(temperature)
@@ -134,6 +155,7 @@ class llamaWindow(QWidget):
         self.temperature = temperature
         self.max_gen_len = max_gen_len
         self.top_p = top_p
+        self.threadAvailable = True
     
     def changeTemp(self):
         self.temperature = self.temperatureInput.value()
@@ -144,11 +166,20 @@ class llamaWindow(QWidget):
     def changeMaxGenLen(self):
         self.max_gen_len = self.max_gen_lenInput.value()
 
-    def submit_text(self):
+    def submitText(self):
+        if not self.threadAvailable:
+            return
+        self.threadAvailable = False
         inputText = self.input_text.toPlainText()
-        results = self.generator.generate([inputText], max_gen_len=self.max_gen_len, temperature=self.temperature, top_p=self.top_p)
-        for result in results: # There should only be one
-            self.input_text.setText(result)
+        self.worker = llamaWorker(self.generator, self.temperature, self.max_gen_len, self.top_p)
+        self.worker.setInputText(inputText)
+        self.thread = threading.Thread(target=self.worker.run)
+        self.worker.finished.connect(self.setText)
+        self.thread.start()
+
+    def setText(self, text):
+        self.threadAvailable = True
+        self.input_text.setText(text)
 
 
 def main(
