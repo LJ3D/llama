@@ -18,6 +18,8 @@ from llama import ModelArgs, Transformer, Tokenizer, LLaMA
 
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QPushButton, QDoubleSpinBox, QSpinBox
 
+import qdarkstyle
+
 driver = "cuda"
 
 def setup_model_parallel() -> Tuple[int, int]:
@@ -177,7 +179,9 @@ def main(
     max_seq_len: int = 512,
     max_batch_size: int = 1,
 ):
+    dark_stylesheet = qdarkstyle.load_stylesheet_pyqt5()
     app = QApplication(sys.argv)
+    app.setStyleSheet(dark_stylesheet)
     window = llamaWindow(ckpt_dir, tokenizer_path, temperature, max_gen_len, top_p, max_seq_len, max_batch_size)
     window.show()
     sys.exit(app.exec_())
