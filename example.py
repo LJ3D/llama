@@ -16,7 +16,7 @@ from fairscale.nn.model_parallel.initialize import initialize_model_parallel
 
 from llama import ModelArgs, Transformer, Tokenizer, LLaMA
 
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QPushButton, QDoubleSpinBox
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QPushButton, QDoubleSpinBox, QSpinBox
 
 driver = "cuda"
 
@@ -78,7 +78,7 @@ def load(
 
 
 class llamaWindow(QWidget):
-    def __init__(self, ckpt_dir, tokenizer_path, temperature, top_p, max_seq_len, max_batch_size):
+    def __init__(self, ckpt_dir, tokenizer_path, temperature, max_gen_len, top_p, max_seq_len, max_batch_size):
         super().__init__()
         self.setWindowTitle("Text Input Window")
         self.setGeometry(100, 100, 500, 300)
@@ -103,7 +103,13 @@ class llamaWindow(QWidget):
         self.top_pInput.setRange(0, 1)
         self.top_pInput.setSingleStep(0.05)
         self.top_pInput.valueChanged.connect(lambda: self.changeTopP())
-
+        self.max_gen_lenLabel = QLabel("Max gen len:")
+        self.max_gen_lenInput = QSpinBox(self)
+        self.max_gen_lenInput.setValue(max_gen_len)
+        self.max_gen_lenInput.setRange(1, 4096)
+        self.max_gen_lenInput.setSingleStep(4)
+        self.max_gen_lenInput.valueChanged.connect(lambda: self.changeMaxGenLen())
+        
         # Create layouts
         input_layout = QVBoxLayout()
         input_layout.addWidget(self.input_label)
@@ -112,6 +118,8 @@ class llamaWindow(QWidget):
         input_layout.addWidget(self.temperatureInput)
         input_layout.addWidget(self.top_pLabel)
         input_layout.addWidget(self.top_pInput)
+        input_layout.addWidget(self.max_gen_lenLabel)
+        input_layout.addWidget(self.max_gen_lenInput)
 
         output_layout = QVBoxLayout()
         output_layout.addWidget(self.output_label)
@@ -132,6 +140,7 @@ class llamaWindow(QWidget):
         local_rank, world_size = setup_model_parallel()
         self.generator = load(ckpt_dir, tokenizer_path, local_rank, world_size, max_seq_len, max_batch_size)
         self.temperature = temperature
+        self.max_gen_len = max_gen_len
         self.top_p = top_p
     
     def changeTemp(self):
@@ -140,9 +149,12 @@ class llamaWindow(QWidget):
     def changeTopP(self):
         self.top_p = self.top_pInput.value()
 
+    def changeMaxGenLen(self):
+        self.max_gen_len = self.max_gen_lenInput.value()
+
     def submit_text(self):
         inputText = self.input_text.toPlainText()
-        results = self.generator.generate([inputText], max_gen_len=256, temperature=self.temperature, top_p=self.top_p)
+        results = self.generator.generate([inputText], max_gen_len=self.max_gen_len, temperature=self.temperature, top_p=self.top_p)
         for result in results: # There should only be one
             self.output_text.setText(result)
 
@@ -151,12 +163,13 @@ def main(
     ckpt_dir: str,
     tokenizer_path: str,
     temperature: float = 0.8,
+    max_gen_len = 256,
     top_p: float = 0.95,
     max_seq_len: int = 512,
     max_batch_size: int = 1,
 ):
     app = QApplication(sys.argv)
-    window = llamaWindow(ckpt_dir, tokenizer_path, temperature, top_p, max_seq_len, max_batch_size)
+    window = llamaWindow(ckpt_dir, tokenizer_path, temperature, max_gen_len, top_p, max_seq_len, max_batch_size)
     window.show()
     sys.exit(app.exec_())
 
