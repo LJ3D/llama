@@ -82,19 +82,13 @@ def load(
 class llamaWindow(QWidget):
     def __init__(self, ckpt_dir, tokenizer_path, temperature, max_gen_len, top_p, max_seq_len, max_batch_size):
         super().__init__()
-        self.setWindowTitle("Text Input Window")
+        self.setWindowTitle("LLaMA GUI")
         self.setGeometry(100, 100, 500, 300)
 
         # Create widgets
-        self.input_label = QLabel("Input Text:")
         self.input_text = QTextEdit()
-        self.output_label = QLabel("Output Text:")
-        self.output_text = QTextEdit()
-        self.output_text.setReadOnly(True)  # Set the output text to read-only
         self.submit_button = QPushButton("Submit")
         self.submit_button.clicked.connect(self.submit_text)
-        self.submit_button_inplace = QPushButton("Submit into input")
-        self.submit_button_inplace.clicked.connect(self.submit_text_inplace)
         self.temperatureLabel = QLabel("Temperature:")
         self.temperatureInput = QDoubleSpinBox(self)
         self.temperatureInput.setValue(temperature)
@@ -116,7 +110,6 @@ class llamaWindow(QWidget):
         
         # Create layouts
         input_layout = QVBoxLayout()
-        input_layout.addWidget(self.input_label)
         input_layout.addWidget(self.input_text)
         input_layout.addWidget(self.temperatureLabel)
         input_layout.addWidget(self.temperatureInput)
@@ -124,18 +117,12 @@ class llamaWindow(QWidget):
         input_layout.addWidget(self.top_pInput)
         input_layout.addWidget(self.max_gen_lenLabel)
         input_layout.addWidget(self.max_gen_lenInput)
-
-        output_layout = QVBoxLayout()
-        output_layout.addWidget(self.output_label)
-        output_layout.addWidget(self.output_text)
-
+        
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.submit_button)
-        button_layout.addWidget(self.submit_button_inplace)
 
         main_layout = QVBoxLayout()
         main_layout.addLayout(input_layout)
-        main_layout.addLayout(output_layout)
         main_layout.addLayout(button_layout)
 
         # Set the main layout of the window
@@ -161,14 +148,8 @@ class llamaWindow(QWidget):
         inputText = self.input_text.toPlainText()
         results = self.generator.generate([inputText], max_gen_len=self.max_gen_len, temperature=self.temperature, top_p=self.top_p)
         for result in results: # There should only be one
-            self.output_text.setText(result)
-
-    def submit_text_inplace(self):
-        inputText = self.input_text.toPlainText()
-        results = self.generator.generate([inputText], max_gen_len=self.max_gen_len, temperature=self.temperature, top_p=self.top_p)
-        for result in results:
-            self.output_text.setText(result)
             self.input_text.setText(result)
+
 
 def main(
     ckpt_dir: str,
