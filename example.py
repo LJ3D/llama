@@ -189,6 +189,9 @@ class llamaWindow(QWidget):
     def setText(self, text):
         self.threadAvailable = True
         self.textEdit.setReadOnly(False)
+        if self.textEdit.toPlainText() == text:
+            self.toggleGenerating()
+            return
         self.textEdit.setText(text)
         if self.generating:
             self.submitText()
